@@ -478,55 +478,60 @@ class MeowClient(discord.Client):
             import time as time_mod
             start_time = time_mod.time()
             
+            stream_error = None
             async with httpx.AsyncClient(timeout=120) as http:
-                async with http.stream(
-                    "POST",
-                    f"{BACKEND_URL.rstrip('/')}/api/ask_stream",
-                    json={
-                        "question": question, 
-                        "image_urls": image_urls,
-                        "emojis_info": emojis_info + ("\n\n" + pinned_info if pinned_info else ""),
-                        "chat_history": chat_history,
-                        "user_name": message.author.display_name,
-                        "user_id": str(message.author.id),
-                        "bot_id": BOT_ID,
-                        "members_info": members_info,
-                    },
-                ) as resp:
-                    if resp.status_code != 200:
-                        print(f"❌ 后端错误：{resp.status_code}", flush=True)
-                        await reply_msg.edit(content="❌ 抱歉，我暂时无法回复，请稍后再试。")
-                        return
-                    
-                    input_tokens = 0
-                    output_tokens = 0
-                    async for line in resp.aiter_lines():
-                        if line.startswith("data: "):
-                            data_str = line[6:]
-                            try:
-                                data = json.loads(data_str)
-                                if "error" in data:
-                                    await reply_msg.edit(content=f"❌ 错误：{data['error']}")
-                                    return
-                                if "done" in data:
-                                    input_tokens = data.get("input_tokens", 0)
-                                    output_tokens = data.get("output_tokens", 0)
-                                    break
-                                if "content" in data:
-                                    answer_chunks.append(data["content"])
-                                    # 每0.8秒更新一次消息，避免频繁编辑
-                                    now = time_mod.time()
-                                    if now - last_update > 0.8:
-                                        current_answer = "".join(answer_chunks)
-                                        if len(current_answer) > 1900:
-                                            current_answer = current_answer[:1900] + "..."
-                                        try:
-                                            await reply_msg.edit(content=current_answer + " ▌")
-                                        except:
-                                            pass
-                                        last_update = now
-                            except:
-                                pass
+                try:
+                    async with http.stream(
+                        "POST",
+                        f"{BACKEND_URL.rstrip('/')}/api/ask_stream",
+                        json={
+                            "question": question, 
+                            "image_urls": image_urls,
+                            "emojis_info": emojis_info + ("\n\n" + pinned_info if pinned_info else ""),
+                            "chat_history": chat_history,
+                            "user_name": message.author.display_name,
+                            "user_id": str(message.author.id),
+                            "bot_id": BOT_ID,
+                            "members_info": members_info,
+                        },
+                    ) as resp:
+                        if resp.status_code != 200:
+                            print(f"❌ 后端错误：{resp.status_code}", flush=True)
+                            await reply_msg.edit(content="❌ 抱歉，我暂时无法回复，请稍后再试。")
+                            return
+                        
+                        input_tokens = 0
+                        output_tokens = 0
+                        async for line in resp.aiter_lines():
+                            if line.startswith("data: "):
+                                data_str = line[6:]
+                                try:
+                                    data = json.loads(data_str)
+                                    if "error" in data:
+                                        await reply_msg.edit(content=f"❌ 错误：{data['error']}")
+                                        return
+                                    if "done" in data:
+                                        input_tokens = data.get("input_tokens", 0)
+                                        output_tokens = data.get("output_tokens", 0)
+                                        break
+                                    if "content" in data:
+                                        answer_chunks.append(data["content"])
+                                        # 每0.8秒更新一次消息，避免频繁编辑
+                                        now = time_mod.time()
+                                        if now - last_update > 0.8:
+                                            current_answer = "".join(answer_chunks)
+                                            if len(current_answer) > 1900:
+                                                current_answer = current_answer[:1900] + "..."
+                                            try:
+                                                await reply_msg.edit(content=current_answer + " ▌")
+                                            except:
+                                                pass
+                                            last_update = now
+                                except:
+                                    pass
+                except Exception as e:
+                    stream_error = e
+                    print(f"[流式输出中断] {e}", flush=True)
             
             # 最终更新
             answer = "".join(answer_chunks).strip()
