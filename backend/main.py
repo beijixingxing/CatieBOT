@@ -522,6 +522,12 @@ def init_db():
     except:
         pass  # 列已存在则忽略
     
+    # 数据库迁移：添加use_chat_history列（是否使用聊天历史）
+    try:
+        cur.execute("ALTER TABLE bot_configs ADD COLUMN use_chat_history INTEGER DEFAULT 1")
+    except:
+        pass  # 列已存在则忽略
+    
     # 知识库表（加bot_id）
     cur.execute(
         """
@@ -726,12 +732,14 @@ def get_bot_config(bot_id: str) -> dict:
     conn.close()
     
     if row:
-        # 兼容旧数据库：检查use_stream列是否存在
+        # 兼容旧数据库：检查新列是否存在
         use_stream = 1
         allowed_channels = ""
+        use_chat_history = 1
         try:
             use_stream = row["use_stream"] if "use_stream" in row.keys() else 1
             allowed_channels = row["allowed_channels"] if "allowed_channels" in row.keys() else ""
+            use_chat_history = row["use_chat_history"] if "use_chat_history" in row.keys() else 1
         except:
             pass
         # 使用 if x is None 而不是 or，避免空字符串被替换为默认值
@@ -743,6 +751,7 @@ def get_bot_config(bot_id: str) -> dict:
             "context_limit": row["context_limit"] if row["context_limit"] is not None else 100,
             "use_stream": use_stream,
             "allowed_channels": allowed_channels or "",
+            "use_chat_history": use_chat_history,
         }
     # 没有配置则用默认
     return DEFAULT_CONFIG.copy()
@@ -753,14 +762,16 @@ def save_bot_config(bot_id: str, config: dict):
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        """INSERT INTO bot_configs (bot_id, llm_base_url, llm_api_key, llm_model, bot_persona, context_limit, use_stream)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
+        """INSERT INTO bot_configs (bot_id, llm_base_url, llm_api_key, llm_model, bot_persona, context_limit, use_stream, use_chat_history)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(bot_id) DO UPDATE SET 
-           llm_base_url = ?, llm_api_key = ?, llm_model = ?, bot_persona = ?, context_limit = ?, use_stream = ?""",
+           llm_base_url = ?, llm_api_key = ?, llm_model = ?, bot_persona = ?, context_limit = ?, use_stream = ?, use_chat_history = ?""",
         (bot_id, config.get("llm_base_url", ""), config.get("llm_api_key", ""),
-         config.get("llm_model", ""), config.get("bot_persona", ""), config.get("context_limit", 100), config.get("use_stream", 1),
+         config.get("llm_model", ""), config.get("bot_persona", ""), config.get("context_limit", 100), 
+         config.get("use_stream", 1), config.get("use_chat_history", 1),
          config.get("llm_base_url", ""), config.get("llm_api_key", ""),
-         config.get("llm_model", ""), config.get("bot_persona", ""), config.get("context_limit", 100), config.get("use_stream", 1))
+         config.get("llm_model", ""), config.get("bot_persona", ""), config.get("context_limit", 100), 
+         config.get("use_stream", 1), config.get("use_chat_history", 1))
     )
     conn.commit()
     conn.close()
@@ -1819,6 +1830,7 @@ async def save_settings(
     bot_persona: str = Form(""),
     context_limit: int = Form(100),
     use_stream: int = Form(1),
+    use_chat_history: int = Form(1),
     admin_password: str = Form(""),
 ):
     global app_config
@@ -1831,6 +1843,7 @@ async def save_settings(
         "bot_persona": bot_persona.strip(),
         "context_limit": context_limit,
         "use_stream": use_stream,
+        "use_chat_history": use_chat_history,
     }
     save_bot_config(bot_id, bot_config)
     
@@ -2240,8 +2253,9 @@ async def api_ask_stream(body: AskRequest):
     # 构建消息
     messages = [{"role": "system", "content": system_prompt}]
     
-    # 添加聊天历史（作为背景信息，减少条数避免混淆）
-    if body.chat_history:
+    # 添加聊天历史（根据配置决定是否启用）
+    use_chat_history = config.get("use_chat_history", 1)
+    if use_chat_history and body.chat_history:
         history_lines = []
         for line in body.chat_history[-5:]:  # 只保留最近5条
             if ": " in line:

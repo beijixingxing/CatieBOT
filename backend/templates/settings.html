@@ -177,6 +177,16 @@
                   >
                 </div>
                 <div class="form-group">
+                  <label class="form-label">聊天历史</label>
+                  <select name="use_chat_history" class="input">
+                    <option value="1" {% if config.use_chat_history %}selected{% endif %}>开启（聊天BOT用）</option>
+                    <option value="0" {% if not config.use_chat_history %}selected{% endif %}>关闭（答疑BOT用）</option>
+                  </select>
+                  <small style="color: var(--text-muted); font-size: 12px"
+                    >关闭后BOT不会读取频道聊天记录，只回答当前问题，避免混淆</small
+                  >
+                </div>
+                <div class="form-group">
                   <label class="form-label">管理员密码</label>
                   <input
                     type="password"
