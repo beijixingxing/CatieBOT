@@ -1100,12 +1100,11 @@ async def create_bot(name: str = Form(...), bot_id: str = Form(...)):
 
 @app.delete("/api/bots/{bot_id}")
 async def delete_bot(bot_id: str):
-    """删除BOT及其所有数据"""
+    """删除BOT（保留知识库，知识库是共享的）"""
     conn = get_db()
     cur = conn.cursor()
-    # 删除关联数据
+    # 删除关联数据（不删除知识库，知识库共享）
     cur.execute("DELETE FROM bot_configs WHERE bot_id = ?", (bot_id,))
-    cur.execute("DELETE FROM knowledge WHERE bot_id = ?", (bot_id,))
     cur.execute("DELETE FROM user_memories WHERE bot_id = ?", (bot_id,))
     cur.execute("DELETE FROM ask_logs WHERE bot_id = ?", (bot_id,))
     cur.execute("DELETE FROM bots WHERE id = ?", (bot_id,))
