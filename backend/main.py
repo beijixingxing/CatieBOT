@@ -732,12 +732,13 @@ def get_bot_config(bot_id: str) -> dict:
             use_stream = row["use_stream"] if "use_stream" in row.keys() else 1
         except:
             pass
+        # 使用 if x is None 而不是 or，避免空字符串被替换为默认值
         return {
-            "llm_base_url": row["llm_base_url"] or DEFAULT_CONFIG["llm_base_url"],
-            "llm_api_key": row["llm_api_key"] or "",
-            "llm_model": row["llm_model"] or DEFAULT_CONFIG["llm_model"],
-            "bot_persona": row["bot_persona"] or DEFAULT_CONFIG["bot_persona"],
-            "context_limit": row["context_limit"] or 100,
+            "llm_base_url": row["llm_base_url"] if row["llm_base_url"] is not None else DEFAULT_CONFIG["llm_base_url"],
+            "llm_api_key": row["llm_api_key"] if row["llm_api_key"] is not None else "",
+            "llm_model": row["llm_model"] if row["llm_model"] is not None else DEFAULT_CONFIG["llm_model"],
+            "bot_persona": row["bot_persona"] if row["bot_persona"] is not None else DEFAULT_CONFIG["bot_persona"],
+            "context_limit": row["context_limit"] if row["context_limit"] is not None else 100,
             "use_stream": use_stream,
         }
     # 没有配置则用默认
