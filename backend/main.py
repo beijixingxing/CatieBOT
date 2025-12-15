@@ -2226,6 +2226,9 @@ async def api_ask_stream(body: AskRequest):
     # 通用艾特规则
     system_extra_parts.append("【重要】如果用户给你一个数字ID让你艾特/批评/评价某人，你必须在回复中使用 <@数字ID> 格式（如 <@1393870232594026506>）来艾特他，这样对方才能收到通知！")
     
+    # 回复规则 - 避免混淆聊天历史
+    system_extra_parts.append("【回复规则】你只需要回复标记为 ⭐当前消息⭐ 的内容！聊天历史只是背景参考，不要回复历史消息。专注于当前对你说话的人。")
+    
     system_extra = "\n\n".join(system_extra_parts)
     system_prompt = bot_persona
     if system_extra:
@@ -2250,9 +2253,9 @@ async def api_ask_stream(body: AskRequest):
                 else:
                     messages.append({"role": role, "content": msg_content})
     
-    # 添加当前问题（支持图片）
+    # 添加当前问题（支持图片）- 用明确标记区分
     if body.image_urls:
-        user_content = [{"type": "text", "text": f"[{body.user_name}] {question}"}]
+        user_content = [{"type": "text", "text": f"⭐当前消息⭐ [{body.user_name}]: {question}"}]
         for img_url in body.image_urls:
             processed_url = await process_image_url(img_url)
             if processed_url:
@@ -2262,11 +2265,9 @@ async def api_ask_stream(body: AskRequest):
                 })
         messages.append({"role": "user", "content": user_content})
     else:
-        user_content = f"[{body.user_name}] {question}"
-        if messages and messages[-1]["role"] == "user":
-            messages[-1]["content"] += f"\n{user_content}"
-        else:
-            messages.append({"role": "user", "content": user_content})
+        # 当前消息单独作为一条，用明确标记区分
+        user_content = f"⭐当前消息⭐ [{body.user_name}]: {question}"
+        messages.append({"role": "user", "content": user_content})
 
     base_url = config.get("llm_base_url", "").rstrip("/")
     url = f"{base_url}/chat/completions"
