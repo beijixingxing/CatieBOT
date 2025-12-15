@@ -2286,6 +2286,8 @@ async def api_ask_stream(body: AskRequest):
             input_tokens = 0
             output_tokens = 0
             full_response = []  # 收集完整回复用于审核
+            prefix_buffer = ""  # 用于检测并过滤回复前缀
+            prefix_checked = False  # 是否已完成前缀检测
             async with httpx.AsyncClient(timeout=120) as client:
                 async with client.stream("POST", url, headers=headers, json=payload) as resp:
                     if resp.status_code != 200:
@@ -2297,6 +2299,9 @@ async def api_ask_stream(body: AskRequest):
                         if line.startswith("data: "):
                             data_str = line[6:]
                             if data_str.strip() == "[DONE]":
+                                # 输出buffer中剩余内容
+                                if prefix_buffer:
+                                    yield f"data: {json.dumps({'content': sanitize_output(prefix_buffer)})}\n\n"
                                 # ========== 输出安全检查 ==========
                                 full_text = "".join(full_response)
                                 is_safe, reason = check_output_safety(full_text)
@@ -2315,9 +2320,25 @@ async def api_ask_stream(body: AskRequest):
                                 if "content" in delta:
                                     chunk = delta["content"]
                                     full_response.append(chunk)
-                                    # 实时过滤敏感词
-                                    chunk = sanitize_output(chunk)
-                                    yield f"data: {json.dumps({'content': chunk})}\n\n"
+                                    
+                                    # 检测并过滤回复前缀 (回复xxx「xxx」）
+                                    if not prefix_checked:
+                                        prefix_buffer += chunk
+                                        # 检查是否有完整的回复前缀
+                                        if len(prefix_buffer) > 100 or (')' in prefix_buffer or '）' in prefix_buffer):
+                                            # 过滤掉回复前缀
+                                            filtered = re.sub(r'^[\(（]回复[^）\)]+[）\)]', '', prefix_buffer)
+                                            if filtered != prefix_buffer:
+                                                print(f"[过滤回复前缀] {prefix_buffer[:50]}...")
+                                            prefix_buffer = filtered.lstrip()
+                                            if prefix_buffer:
+                                                yield f"data: {json.dumps({'content': sanitize_output(prefix_buffer)})}\n\n"
+                                            prefix_buffer = ""
+                                            prefix_checked = True
+                                    else:
+                                        # 实时过滤敏感词
+                                        chunk = sanitize_output(chunk)
+                                        yield f"data: {json.dumps({'content': chunk})}\n\n"
                             except:
                                 pass
         except Exception as e:
