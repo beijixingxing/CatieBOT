@@ -213,7 +213,7 @@
       async function deleteBot(botId, botName) {
         if (
           !confirm(
-            `确定要删除 "${botName}" 吗？\n\n这将删除该BOT的所有配置、知识库和用户记忆！`
+            `确定要删除 "${botName}" 吗？\n\n这将删除该BOT的所有配置和用户记忆！（知识库不会删除）`
           )
         ) {
           return;
