@@ -227,11 +227,9 @@ class MeowClient(discord.Client):
         if not is_mentioned and not is_reply_to_bot:
             return
         
-        # 检查用户是否被拉黑
+        # 检查用户是否被拉黑（直接无视，不回复）
         blacklist_result = await check_blacklist(str(message.author.id))
         if blacklist_result.get("banned"):
-            reason = blacklist_result.get("reason", "违规行为")
-            await message.reply(f"你已被拉黑，原因：{reason}")
             return
         
         # Bot对Bot：添加冷却防止无限循环（同频道5秒内不重复回复同一个Bot）
