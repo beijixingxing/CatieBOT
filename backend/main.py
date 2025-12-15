@@ -2230,7 +2230,7 @@ async def api_ask_stream(body: AskRequest):
     system_extra_parts.append("【重要】如果用户给你一个数字ID让你艾特/批评/评价某人，你必须在回复中使用 <@数字ID> 格式（如 <@1393870232594026506>）来艾特他，这样对方才能收到通知！")
     
     # 回复规则 - 避免混淆聊天历史
-    system_extra_parts.append("【回复规则】你只需要回复标记为 ⭐当前消息⭐ 的内容！聊天历史只是背景参考，不要回复历史消息。专注于当前对你说话的人。")
+    system_extra_parts.append("【回复规则】你只需要回复标记为 ⭐当前消息⭐ 的内容！聊天历史只是背景参考，不要回复历史消息。专注于当前对你说话的人。绝对不要重复你之前说过的话！")
     
     system_extra = "\n\n".join(system_extra_parts)
     system_prompt = bot_persona
